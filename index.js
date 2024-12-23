@@ -3,7 +3,7 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 5000;
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.use(cors());
 app.use(express.json());
@@ -29,6 +29,7 @@ async function run() {
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     const serviceCollection = client.db("serviceReview").collection("services");
+    const reviewCollection = client.db('allReviews').collection('reviews');
 
     // Perform the CRUD operations here
     app.post('/addService', async(req,res)=>{
@@ -37,10 +38,48 @@ async function run() {
       res.send(result);
     })
 
+    // Read all services
     app.get('/services', async(req,res)=>{
       const cursor = serviceCollection.find();
-      const services = await cursor.toArray();
-      res.send(services);
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    // Home page 6 data
+    app.get('/some-services', async(req,res)=>{
+      const cursor = serviceCollection.find().limit(6);
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
+    // Read a single service
+    app.get('/service/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await serviceCollection.findOne(query);
+      res.send(result);
+    })
+
+    // Get a single service by email
+    app.get('/services/:email', async(req,res)=>{
+      const email = req.params.email;
+      const query = {email}
+      const result = await serviceCollection.find(query).toArray();
+      res.send(result);
+    })
+
+    // Review related APIs
+    app.post('/allReviews', async(req,res)=>{
+      const reviews = req.body;
+      const result = await reviewCollection.insertOne(reviews);
+      res.send(result);
+    })
+
+    // Get all reviews
+    app.get('/reviews', async(req,res)=>{
+      const cursor = reviewCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
     })
 
   } finally {
