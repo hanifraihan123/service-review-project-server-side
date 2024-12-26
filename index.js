@@ -8,7 +8,7 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 app.use(cors({
-  origin: ['http://localhost:5173',],
+  origin: ['http://localhost:5173','https://service-review-client-419db.web.app'],
   credentials: true
 }));
 app.use(express.json());
@@ -43,16 +43,17 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
     const serviceCollection = client.db("serviceReview").collection("services");
     const reviewCollection = client.db('allReviews').collection('reviews');
+    const userCollection = client.db("allUsers").collection('users');
 
     // Perform the CRUD operations here
-    app.post('/addService', async(req,res)=>{
+    app.post('/addService',verifyToken, async(req,res)=>{
       const service = req.body;
       const result = await serviceCollection.insertOne(service);
       res.send(result);
@@ -65,8 +66,9 @@ async function run() {
         expiresIn: '10h'});
         res
         .cookie('token',token,{
+            sameSite: 'none',
             httpOnly: true,
-            secure: false
+            secure: true
             })
         .send({success: true})
     })
@@ -74,17 +76,28 @@ async function run() {
     app.post('/logout', (req,res)=>{
       res
       .clearCookie('token', {
-        httpOnly: true,
-        secure: false
+            sameSite: 'none',
+            httpOnly: true,
+            secure: true
       })
       .send({success: true})
     })
 
     // Read all services
     app.get('/services', async(req,res)=>{
-      const cursor = serviceCollection.find();
+      const filter = req.query.filter;
+      const search = req.query.search;
+      let query = {title: { $regex:search, $options:'i' }};
+      if(filter) query.category = filter;
+      const cursor = serviceCollection.find(query);
       const result = await cursor.toArray();
       res.send(result);
+    })
+
+    app.get('/allService', async(req,res)=>{
+      const cursor = serviceCollection.find();
+      const result = await cursor.toArray();
+      res.send(result)
     })
 
     // Home page 6 data
@@ -102,10 +115,24 @@ async function run() {
       res.send(result);
     })
 
+    // Update service Details APIs
+    // app.patch('/services/:id', async(req,res)=>{
+    //   const id = req.params.id;
+    //   const filter = {_id: new ObjectId(id)}
+    //   const updatedService = {
+    //     $set: {
+
+    //     }
+    //   }
+    //   const result = await serviceCollection.updateOne(filter,updatedService)
+    //   res.send(result)
+    // })
+
     // Get a single service by email
     app.get('/services/:email',verifyToken, async(req,res)=>{
       const email = req.params.email;
-      const query = {email}
+      const search = req.query.search;
+      const query = {email,category: { $regex:search, $options:'i' }}
       if(req.user.email !== req.params.email){
         return res.status(403).send({message: 'Forbidden Access'})
       }
@@ -114,7 +141,7 @@ async function run() {
     })
 
     // Service Delete related APIs
-    app.delete('/service/:id', async(req,res)=>{
+    app.delete('/service/:id',verifyToken, async(req,res)=>{
       const id = req.params.id;
       const query = {_id: new ObjectId(id)}
       const result = await serviceCollection.deleteOne(query)
@@ -143,21 +170,57 @@ async function run() {
       res.send(result)
     })
 
+    
+    // Update Review details related APIs
+    app.patch('/review/:id', async(req,res)=>{
+      const id = req.params.id;
+      const updateReview = req.body;
+      const filter = {_id: new ObjectId(id)}
+      const updatedReview = {
+        $set: {
+          review: updateReview.review,rating: updateReview.rating
+        }
+      }
+      const result = await reviewCollection.updateOne(filter,updatedReview)
+      res.send(result)
+    })
+
     // Get User's Review
-    app.get('/review/:email', async(req,res)=>{
+    app.get('/review/:email',verifyToken, async(req,res)=>{
       const email = req.params.email;
       const query = {email};
       const result = await reviewCollection.find(query).toArray();
       res.send(result);
     })
 
-    app.delete('/review/:id', async(req,res)=>{
+    app.delete('/review/:id',verifyToken, async(req,res)=>{
       const id = req.params.id;
       const query = {_id: new ObjectId(id)}
       const result = await reviewCollection.deleteOne(query);
       res.send(result)
     })
-    
+
+    // User Collection APIs
+    app.post('/addUser', async(req,res)=>{
+      const user = req.body;
+      // if(user.email === "") return res.status(400).send('Empty User cant add')
+      const query = {email: user.email}
+      const alreadyExist = await userCollection.findOne(query);
+        if (alreadyExist)
+        return res
+          .status(400)
+          .send('You have already registered')
+          const result = await userCollection.insertOne(user)
+          res.send(result)
+    })
+   
+    // Get All users
+    app.get('/users', async(req,res)=>{
+      const cursor = userCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    })
+
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
