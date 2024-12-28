@@ -115,19 +115,6 @@ async function run() {
       res.send(result);
     })
 
-    // Update service Details APIs
-    // app.patch('/services/:id', async(req,res)=>{
-    //   const id = req.params.id;
-    //   const filter = {_id: new ObjectId(id)}
-    //   const updatedService = {
-    //     $set: {
-
-    //     }
-    //   }
-    //   const result = await serviceCollection.updateOne(filter,updatedService)
-    //   res.send(result)
-    // })
-
     // Get a single service by email
     app.get('/services/:email',verifyToken, async(req,res)=>{
       const email = req.params.email;
@@ -147,6 +134,42 @@ async function run() {
       const result = await serviceCollection.deleteOne(query)
       res.send(result)
     })
+
+    // Get Specific service
+    app.get('service/:id', async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id: new ObjectId(id)};
+      const result = await serviceCollection.findOne(query);
+      res.send(result)
+    })
+
+    // Update service Details APIs
+    app.patch('/services/:id', async(req,res)=>{
+      const serviceData = req.body;
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updatedService = {
+        $set: {
+          title: serviceData.title,category: serviceData.category,price: serviceData.price
+        }
+      }
+      const result = await serviceCollection.updateOne(filter,updatedService)
+      res.send(result)
+    })
+
+        // Update Review Details APIs
+        app.patch('/reviews/:id', async(req,res)=>{
+          const reviewData = req.body;
+          const id = req.params.id;
+          const filter = {_id: new ObjectId(id)}
+          const updatedReview = {
+            $set: {
+              title: reviewData.title,category: reviewData.category,price: reviewData.price
+            }
+          }
+          const result = await reviewCollection.updateOne(filter,updatedReview)
+          res.send(result)
+        })
 
     // Review related APIs
     app.post('/allReviews', async(req,res)=>{
@@ -182,8 +205,17 @@ async function run() {
         }
       }
       const result = await reviewCollection.updateOne(filter,updatedReview)
+      // const result2 = await reviewCollection.find().toArray();
       res.send(result)
     })
+
+        // Get Specific review
+        app.get('/update/review/:id', async(req,res)=>{
+          const id = req.params.id;
+          const query = {_id: new ObjectId(id)};
+          const result = await reviewCollection.findOne(query);
+          res.send(result)
+        })
 
     // Get User's Review
     app.get('/review/:email',verifyToken, async(req,res)=>{
@@ -220,6 +252,20 @@ async function run() {
       const result = await cursor.toArray();
       res.send(result);
     })
+
+    // Get document count
+    app.get('/serviceCount', async (req,res)=>{
+      const count = await serviceCollection.estimatedDocumentCount();
+      res.send({count});
+    })
+
+    // Get Pagination
+    app.get('/servicePage', async(req, res) => {
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size);
+      const result = await serviceCollection.find().skip(page * size).limit(size).toArray();
+      res.send(result);
+  })
 
   } finally {
     // Ensures that the client will close when you finish/error
